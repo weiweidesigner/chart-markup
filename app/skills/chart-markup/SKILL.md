@@ -34,6 +34,7 @@ JEV may choose a semantic `markStrategy`, such as turning points, event callouts
 ## Renderer mapping
 
 - `line_chart.py`, `group_line.py`: point/event markers, reference lines, selected ranges, series color/width/opacity, title text style.
+- `grouped_bar.py` additionally supports explicit `bar-placeholder` marks: hatched missing-value bars whose height references another same-row series. Keep target data null, use localized status in tooltip/legend, and compile to native `barPlaceholders`; see the protocol. Never synthesize actual values or switch to custom HTML for this capability.
 - `bar_chart.py`, `grouped_bar.py`: series emphasis, exact category/series recoloring, value-driven `colorRules` for signed-direction bars, and x-bin-driven `distributionColor` for signed distributions.
 - `bar_line.py`: bar/line series emphasis, signed-direction `colorRules` for column series, and title text style.
 - `pie.py`, `treemap.py`, `waterfall.py`: exact item recoloring; treemap lookup may match a unique nested label.

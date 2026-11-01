@@ -9,7 +9,7 @@ Top-level shape:
   "maxMarks": 10,
   "marks": [
     {
-      "type": "point|reference-line|range|series-style|item-style|text-style",
+      "type": "point|reference-line|range|series-style|item-style|text-style|bar-placeholder",
       "target": {"series": "field or label", "x": "exact x value", "index": 0, "label": "exact item label", "role": "title|metric"},
       "style": {"color": "#ef4444", "fontWeight": 700, "strokeWidth": 3, "opacity": 1},
       "label": "reader-facing annotation",
@@ -54,3 +54,13 @@ Top-level shape:
 - `distribution-polarity`: renderer-level semantic encoding for signed distributions. The x-axis bin determines polarity while the y-axis remains frequency/frequency share: negative bins use `#ff2f57`, positive bins use `#00b899`, bins containing zero use `#94a3b8`, and the renderer shows a zero reference. It does not count against `maxMarks`.
 
 Generated payloads include `_chartMarkup` metadata with applied and skipped marks. This metadata is provenance, not a renderer instruction.
+
+## Missing grouped-bar placeholders
+
+`bar-placeholder` is supported by `grouped_bar.py` only. Resolve `target.series` and `target.x` (or `index`) exactly; `referenceSeries` is a distinct series field or unique label in the same row. The target must be absent/null/empty and the reference finite. Existing values, missing references, ambiguous targets and duplicates are rejected/skipped with a reason. Never assign the reference to the source target. Set a localized `label` (e.g. 尚未公布) and optional `style.color` for hatch/outline. The transparent hatched bar extends from zero to the reference, including negative references. Tooltip displays the status, not a fabricated actual number; legend explains the pattern. Marks do not enter source statistics.
+
+```json
+{"type":"bar-placeholder","target":{"series":"actual","x":"Q4"},"referenceSeries":"estimate","label":"尚未公布"}
+```
+
+Compile this mark to the renderer's `barPlaceholders: [{"series":"actual","x":"Q4","referenceSeries":"estimate","label":"尚未公布"}]` array when authoring routes directly. Preserve `actual: null` in data. The helper resolves it to an index; the renderer supports exact x or index. This uses the native grouped-bar renderer, not custom HTML.

@@ -14,7 +14,7 @@ from typing import Any
 LINE_SCRIPTS = {"line_chart.py", "group_line.py"}
 BAR_SCRIPTS = {"bar_chart.py", "grouped_bar.py"}
 ITEM_SCRIPTS = {"pie.py", "treemap.py", "waterfall.py", "double_ring_pie.py"}
-SUPPORTED_TYPES = {"point", "reference-line", "range", "series-style", "item-style", "text-style"}
+SUPPORTED_TYPES = {"point", "reference-line", "range", "series-style", "item-style", "text-style", "bar-placeholder"}
 
 
 def protocol_schema() -> dict[str, Any]:
@@ -25,6 +25,7 @@ def protocol_schema() -> dict[str, Any]:
         "maxMarks": "optional non-negative user/request limit; values above five are honored",
         "markTypes": sorted(SUPPORTED_TYPES),
         "target": {"series": "exact field or label", "x": "exact x value", "index": "integer", "label": "exact item label", "role": "title|metric"},
+        "barPlaceholder": {"referenceSeries": "exact same-row reference field or unique label", "label": "localized missing status", "style": {"color": "optional hatch/outline color"}},
         "invariant": "Every target must resolve uniquely against the payload; unresolved marks are skipped.",
     }
 
@@ -250,6 +251,34 @@ def _apply_bar_item(component: dict[str, Any], mark: dict[str, Any]) -> tuple[bo
     return True, "bar item color applied"
 
 
+def _apply_bar_placeholder(component: dict[str, Any], mark: dict[str, Any]) -> tuple[bool, str]:
+    selector = _selector(mark)
+    index, error = _resolve_index(component, selector)
+    if error or index is None:
+        return False, error or "category not found"
+    series, error = _resolve_series(component, selector.get("series"))
+    reference, ref_error = _resolve_series(component, mark.get("referenceSeries"))
+    if error or ref_error or series is None or reference is None:
+        return False, error or ref_error or "both series are required"
+    row = _data(component)[index]
+    field, ref = str(series["field"]), str(reference["field"])
+    if field == ref or row.get(field) not in (None, ""):
+        return False, "placeholder requires a missing target and a distinct reference series"
+    value = row.get(ref)
+    try:
+        valid = value not in (None, "") and not isinstance(value, bool) and math.isfinite(float(value))
+    except (TypeError, ValueError):
+        valid = False
+    if not valid:
+        return False, "placeholder reference must be a finite same-row value"
+    placeholders = _props(component).setdefault("barPlaceholders", [])
+    if any(item.get("index") == index and item.get("series") == field for item in placeholders):
+        return False, "duplicate placeholder target"
+    placeholders.append({"index": index, "series": field, "referenceSeries": ref,
+                         "label": str(mark.get("label") or "—"), "style": _mark_style(mark)})
+    return True, "hatched missing-bar placeholder applied; source values unchanged"
+
+
 def _apply_item_mark(component: dict[str, Any], script: str, mark: dict[str, Any], mark_type: str) -> tuple[bool, str]:
     selector = _selector(mark)
     style = _mark_style(mark)
@@ -302,6 +331,8 @@ def apply_marks(payload: dict[str, Any], script: str, plan: dict[str, Any]) -> t
         elif script in BAR_SCRIPTS:
             if mark_type == "series-style":
                 ok, reason = _apply_series_mark(component, raw_mark)
+            elif mark_type == "bar-placeholder" and script == "grouped_bar.py":
+                ok, reason = _apply_bar_placeholder(component, raw_mark)
             elif mark_type == "item-style":
                 ok, reason = _apply_bar_item(component, raw_mark)
             else:

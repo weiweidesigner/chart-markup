@@ -129,3 +129,17 @@ def test_all_mode_preserves_every_supplied_mark_without_max_marks() -> None:
     assert sum(item.get("color") == "#2563eb" for item in enhanced["items"]) == 12
     assert report["effectiveMaxMarks"] == 12
     assert report["skipped"] == []
+
+
+def test_missing_bar_placeholder_preserves_values_and_reports_invalid_targets():
+    payload = {'xField': 'q', 'series': [{'field': 'actual'}, {'field': 'estimate'}],
+               'data': [{'q': 'Q1', 'actual': 0, 'estimate': 2}, {'q': 'Q2', 'actual': None, 'estimate': -3}, {'q': 'Q3', 'actual': None, 'estimate': None}]}
+    def mark(q): return {'type': 'bar-placeholder', 'target': {'series': 'actual', 'x': q}, 'referenceSeries': 'estimate', 'label': '尚未公布'}
+    enhanced, report = chart_markup.apply_marks(payload, 'grouped_bar.py', {'selectionMode': 'all', 'marks': [mark('Q2'), mark('Q1'), mark('Q3'), mark('Q2')]})
+    assert enhanced['data'] == payload['data']
+    assert 'barPlaceholders' not in payload
+    assert enhanced['barPlaceholders'][0]['index'] == 1
+    assert len(report['applied']) == 1 and len(report['skipped']) == 3
+    assert 'bar-placeholder' in chart_markup.protocol_schema()['markTypes']
+    _, unsupported = chart_markup.apply_marks(payload, 'bar_chart.py', {'marks': [mark('Q2')]})
+    assert len(unsupported['skipped']) == 1
